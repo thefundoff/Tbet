@@ -10,15 +10,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  // Validate the Telegram webhook secret to reject spoofed requests
-  const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET
-  const incomingSecret = req.headers['x-telegram-bot-api-secret-token']
-  if (!expectedSecret || incomingSecret !== expectedSecret) {
-    logger.warn('Webhook: invalid or missing secret token')
-    res.status(401).json({ error: 'Unauthorized' })
-    return
-  }
-
   try {
     const bot = createBot()
     // Parse the update from Telegram and process it
