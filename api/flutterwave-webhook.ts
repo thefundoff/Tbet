@@ -20,15 +20,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const event = req.body?.event
-  const data  = req.body?.data
+  const payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
+  const event   = payload?.event
+  const data    = payload?.data
 
-  logger.info('Flutterwave webhook received', { event, status: data?.status, txRef: data?.tx_ref })
+  logger.info('Flutterwave webhook received', { body: payload, event, status: data?.status, txRef: data?.tx_ref })
 
   // Only process successful charge events
   if (event !== 'charge.completed' || data?.status !== 'successful') {
     logger.warn('Flutterwave webhook: skipping event', { event, status: data?.status })
-    res.status(200).json({ received: true })
+    res.status(200).json({ received: true, event, status: data?.status })
     return
   }
 
