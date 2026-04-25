@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.vercel/
+*.js.map
+BOT_OVERVIEW.md
+DEPLOYMENT.md
+HOW_IT_WORKS.md
+.claude
