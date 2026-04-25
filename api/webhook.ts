@@ -12,6 +12,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   try {
     const bot = createBot()
+    await bot.init()
     // Parse the update from Telegram and process it
     const update = req.body
     await bot.handleUpdate(update)
