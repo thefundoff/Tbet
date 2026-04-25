@@ -21,7 +21,7 @@ export async function handleGencode(ctx: Context): Promise<void> {
     return
   }
 
-  const args    = ((ctx.match as string | undefined) ?? '').trim().split(/\s+/)
+  const args    = (typeof ctx.match === 'string' ? ctx.match.trim() : '').split(/\s+/)
   const tierArg = args[0]?.toLowerCase() as Exclude<PlanTier, 'free'> | undefined
   const count   = parseInt(args[1] ?? '1', 10)
 

@@ -14,7 +14,7 @@ function yesterday(): string {
 }
 
 export async function handleResults(ctx: Context): Promise<void> {
-  const arg = (ctx.match as string | undefined)?.trim()
+  const arg = typeof ctx.match === 'string' ? ctx.match.trim() : undefined
   let date: string
 
   if (arg && /^\d{4}-\d{2}-\d{2}$/.test(arg)) {
