@@ -91,10 +91,58 @@ export async function showPlanDetail(ctx: Context, tier: Exclude<PlanTier, 'free
   await editOrReply(ctx, text, { parse_mode: 'HTML', reply_markup: kb })
 }
 
-// ── Purchase confirmation ─────────────────────────────────────────────────────
+// ── Purchase confirmation — Flutterwave ───────────────────────────────────────
 
 export async function showPurchaseConfirmation(ctx: Context, tier: Exclude<PlanTier, 'free'>): Promise<void> {
-  const plan = PLANS[tier]
+  const userId = ctx.from?.id
+  if (!userId) { await ctx.reply('⚠️ Could not identify your account.'); return }
+
+  const plan    = PLANS[tier]
+  const txRef   = `tbet-${userId}-${tier}-${Date.now()}`
+  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : ''
+
+  // Show spinner while we hit the Flutterwave API
+  await editOrReply(ctx, '⏳ Preparing your payment link…', { parse_mode: 'HTML' })
+
+  let paymentLink: string
+  try {
+    const res = await fetch('https://api.flutterwave.com/v3/payments', {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${process.env.FLW_SECRET_KEY}`,
+      },
+      body: JSON.stringify({
+        tx_ref:       txRef,
+        amount:       plan.priceNGN,
+        currency:     'NGN',
+        redirect_url: `${baseUrl}/api/payment-complete`,
+        customer: {
+          email: `user${userId}@tbet.app`,
+          name:  ctx.from?.first_name ?? 'Tbet User',
+        },
+        meta: { telegram_user_id: userId, plan_tier: tier },
+        customizations: {
+          title:       'Tbet Subscription',
+          description: `${plan.name} Plan — ${plan.matchLimit} pick${plan.matchLimit > 1 ? 's' : ''}/day`,
+        },
+      }),
+    })
+
+    const json = await res.json() as { status: string; data?: { link: string } }
+    if (json.status !== 'success' || !json.data?.link) {
+      throw new Error(`Flutterwave API error: ${json.status}`)
+    }
+    paymentLink = json.data.link
+  } catch (err) {
+    logger.error('showPurchaseConfirmation: Flutterwave init failed', { userId, tier, error: String(err) })
+    const kb = new InlineKeyboard().text('⬅️ Back to Plans', 'plans')
+    await ctx.reply(
+      '⚠️ <b>Payment Unavailable</b>\n\nCould not initialise payment right now. Please try again in a moment.',
+      { parse_mode: 'HTML', reply_markup: kb }
+    )
+    return
+  }
 
   const expiryDate = new Date()
   expiryDate.setDate(expiryDate.getDate() + plan.durationDays)
@@ -104,18 +152,20 @@ export async function showPurchaseConfirmation(ctx: Context, tier: Exclude<PlanT
 
   const text =
     `🧾 <b>Order Summary</b>\n\n` +
-    `Plan:     ${plan.emoji} ${plan.name}\n` +
-    `Price:    <b>${plan.price}</b>\n` +
-    `Access:   ${plan.durationDays === 1 ? 'Today only' : `${plan.durationDays} days`}\n` +
-    `Expires:  ${expLabel}\n` +
+    `Plan:      ${plan.emoji} ${plan.name}\n` +
+    `Price:     <b>${plan.price}</b>\n` +
+    `Access:    ${plan.durationDays === 1 ? 'Today only' : `${plan.durationDays} days`}\n` +
+    `Expires:   ${expLabel}\n` +
     `Picks/day: <b>${plan.matchLimit}</b>\n\n` +
-    `⚠️ <i>This is a mock payment — no real charge will be made.</i>`
+    `Tap the button below to pay securely via Flutterwave.\n` +
+    `<i>Your plan activates automatically once payment is confirmed.</i>`
 
   const kb = new InlineKeyboard()
-    .text('✅ Confirm', `confirm_${tier}`)
+    .url(`💳 Pay ${plan.price} Now`, paymentLink)
+    .row()
     .text('❌ Cancel', `plan_${tier}`)
 
-  await editOrReply(ctx, text, { parse_mode: 'HTML', reply_markup: kb })
+  await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb })
 }
 
 // ── Activate plan (mock) ──────────────────────────────────────────────────────

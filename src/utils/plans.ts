@@ -6,6 +6,7 @@ export interface Plan {
   emoji: string
   matchLimit: number
   price: string
+  priceNGN: number
   durationDays: number
   tagline: string
   features: string[]
@@ -18,6 +19,7 @@ export const PLANS: Record<Exclude<PlanTier, 'free'>, Plan> = {
     emoji: '📅',
     matchLimit: 2,
     price: '₦500',
+    priceNGN: 500,
     durationDays: 1,
     tagline: '2 top picks — valid today only',
     features: [
@@ -33,6 +35,7 @@ export const PLANS: Record<Exclude<PlanTier, 'free'>, Plan> = {
     emoji: '📆',
     matchLimit: 4,
     price: '₦2,500',
+    priceNGN: 2500,
     durationDays: 7,
     tagline: '4 picks per day — 7 days access',
     features: [
@@ -49,6 +52,7 @@ export const PLANS: Record<Exclude<PlanTier, 'free'>, Plan> = {
     emoji: '🗓️',
     matchLimit: 10,
     price: '₦8,000',
+    priceNGN: 8000,
     durationDays: 30,
     tagline: '10 picks per day — 30 days access',
     features: [

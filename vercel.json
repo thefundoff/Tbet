@@ -1,6 +1,8 @@
 {
   "version": 2,
   "functions": {
-    "api/webhook.ts": { "maxDuration": 60 }
+    "api/webhook.ts":              { "maxDuration": 60 },
+    "api/flutterwave-webhook.ts":  { "maxDuration": 30 },
+    "api/payment-complete.ts":     { "maxDuration": 10 }
   }
 }
