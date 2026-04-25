@@ -21,20 +21,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
-  const event   = payload?.event
-  const data    = payload?.data
 
-  logger.info('Flutterwave webhook received', { body: payload, event, status: data?.status, txRef: data?.tx_ref })
+  // Support both Flutterwave v3 format ({ event, data }) and legacy flat format
+  const status        = payload?.data?.status ?? payload?.status
+  const transactionId = payload?.data?.id     ?? payload?.id
+  const txRef: string = payload?.data?.tx_ref ?? payload?.txRef ?? ''
+
+  logger.info('Flutterwave webhook received', { event: payload?.event, status, txRef })
 
   // Only process successful charge events
-  if (event !== 'charge.completed' || data?.status !== 'successful') {
-    logger.warn('Flutterwave webhook: skipping event', { event, status: data?.status })
-    res.status(200).json({ received: true, event, status: data?.status })
+  if (status !== 'successful') {
+    logger.warn('Flutterwave webhook: skipping event', { event: payload?.event, status })
+    res.status(200).json({ received: true })
     return
   }
-
-  const transactionId: number = data.id
-  const txRef: string         = data.tx_ref ?? ''
 
   // tx_ref format: tbet-{userId}-{tier}-{timestamp}
   const parts = txRef.split('-')
