@@ -54,13 +54,16 @@ export async function handlePredict(ctx: Context): Promise<void> {
 
   const plan = PLANS[tier]
 
-  // ── Daily fetch limit check ─────────────────────────────────────────────────
-  if (user?.last_prediction_fetch_date === today) {
+  // ── Daily fetch limit check (3 fetches per day) ────────────────────────────
+  const MAX_DAILY_FETCHES = 3
+  const isSameDay   = user?.last_prediction_fetch_date === today
+  const fetchCount  = isSameDay ? (user?.prediction_fetch_count ?? 0) : 0
 
+  if (isSameDay && fetchCount >= MAX_DAILY_FETCHES) {
     const midnight = new Date()
     midnight.setUTCDate(midnight.getUTCDate() + 1)
     midnight.setUTCHours(0, 0, 0, 0)
-    const hoursLeft = Math.ceil((midnight.getTime() - Date.now()) / 3_600_000)
+    const hoursLeft  = Math.ceil((midnight.getTime() - Date.now()) / 3_600_000)
     const resetLabel = hoursLeft === 1 ? '1 hour' : `${hoursLeft} hours`
 
     const isUpgradeable = tier === 'daily' || tier === 'weekly'
@@ -75,9 +78,9 @@ export async function handlePredict(ctx: Context): Promise<void> {
     kb.text('🏠 Main Menu', 'cmd_start')
 
     await ctx.reply(
-      `🔒 <b>Today's picks already delivered.</b>\n\n` +
-      `You've already received your <b>${plan.matchLimit} pick${plan.matchLimit > 1 ? 's' : ''}</b> for today.\n` +
-      `Your next fetch resets in <b>${resetLabel}</b> (midnight UTC).${upgradeText}`,
+      `🔒 <b>Daily fetch limit reached.</b>\n\n` +
+      `You've fetched predictions <b>${MAX_DAILY_FETCHES} times</b> today.\n` +
+      `Your fetches reset in <b>${resetLabel}</b> (midnight UTC).${upgradeText}`,
       { parse_mode: 'HTML', reply_markup: kb }
     )
     return
@@ -128,7 +131,7 @@ export async function handlePredict(ctx: Context): Promise<void> {
     }
 
     // Record successful fetch — fire and forget so it never blocks the user
-    recordPredictionFetch(userId, today).catch(err =>
+    recordPredictionFetch(userId, today, fetchCount, !isSameDay).catch(err =>
       logger.warn('recordPredictionFetch failed', { userId, error: String(err) })
     )
   } catch (err) {

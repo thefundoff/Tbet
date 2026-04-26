@@ -10,6 +10,7 @@ export interface User {
   plan: string | null
   plan_expires_at: string | null
   last_prediction_fetch_date: string | null
+  prediction_fetch_count: number
   created_at: string
   updated_at: string
 }
@@ -68,12 +69,17 @@ export async function getSubscribedUsers(): Promise<User[]> {
   return (data ?? []) as User[]
 }
 
-export async function recordPredictionFetch(userId: number, date: string): Promise<void> {
+export async function recordPredictionFetch(userId: number, date: string, currentCount: number, isNewDay: boolean): Promise<void> {
   const db = getSupabaseClient()
   const { error } = await db
     .from('users')
     .upsert(
-      { id: userId, last_prediction_fetch_date: date, updated_at: new Date().toISOString() },
+      {
+        id: userId,
+        last_prediction_fetch_date: date,
+        prediction_fetch_count: isNewDay ? 1 : currentCount + 1,
+        updated_at: new Date().toISOString(),
+      },
       { onConflict: 'id', ignoreDuplicates: false }
     )
   if (error) {
