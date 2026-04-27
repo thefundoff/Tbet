@@ -8,3 +8,14 @@ export const TELEGRAM_SEND_DELAY_MS = 60 // ~16 msg/sec — well under Telegram'
 export const MIN_PREDICTION_CONFIDENCE  = 45  // only surface predictions where we're ≥45% confident
 export const SAFE_CONFIDENCE_THRESHOLD  = 65  // minimum confidence for the "safe games" filter
 export const SAFE_GAME_COUNT            = 3   // maximum picks shown when safe games filter is active
+
+export const DEFAULT_WEIGHTS = {
+  form: 0.30, goalPerf: 0.25, h2h: 0.20, standing: 0.15, goalsAvg: 0.10,
+} as const
+
+export const LEARNING_TRIGGER_BATCH    = 10    // min new resolutions needed to attempt learning
+export const MIN_LEARNING_SAMPLE       = 30    // min total resolved predictions required
+export const WEIGHT_MIN                = 0.05
+export const WEIGHT_MAX                = 0.50
+export const LEARNING_RATE             = 0.3
+export const LEARNING_MIN_IMPROVEMENT  = 0.01

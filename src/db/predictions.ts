@@ -134,7 +134,15 @@ export async function resolvePredictions(
     }
   }
 
-  if (resolved > 0) logger.info('Predictions resolved', { date, resolved })
+  if (resolved > 0) {
+    logger.info('Predictions resolved', { date, resolved })
+    // Dynamic import avoids circular dependency: predictions ← learner ← weights ← client
+    import('../prediction/learner').then(({ maybeRunLearning }) =>
+      maybeRunLearning(resolved).catch(err =>
+        logger.warn('maybeRunLearning failed silently', { error: String(err) })
+      )
+    ).catch(() => { /* ignore import errors */ })
+  }
   return resolved
 }
 

@@ -184,7 +184,7 @@ export async function buildPredictions(date: string) {
       const awayStanding = undefined
 
       // Stats prediction always runs — used for O/U and BTTS
-      const statsResult = generatePrediction({ fixture, homeStats, awayStats, h2h, homeStanding, awayStanding })
+      const statsResult = await generatePrediction({ fixture, homeStats, awayStats, h2h, homeStanding, awayStanding })
 
       // 1X2: prefer market odds, fall back to statistical
       let homeProbability: number
