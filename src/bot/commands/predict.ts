@@ -24,14 +24,13 @@ export async function handlePredict(ctx: Context): Promise<void> {
     return
   }
 
-  const today = new Date().toISOString().split('T')[0]
-  const user  = await getUserById(userId)
+  const user = await getUserById(userId)
 
   // ── Plan check ──────────────────────────────────────────────────────────────
   const tier = getActivePlanTier(user?.plan, user?.plan_expires_at)
 
   if (tier === 'free') {
-    const hadPlan    = user?.plan && user.plan !== 'free'
+    const hadPlan     = user?.plan && user.plan !== 'free'
     const expiredNote = hadPlan ? '\n\n⏰ <i>Your previous plan has expired.</i>' : ''
 
     const kb = new InlineKeyboard()
@@ -44,7 +43,7 @@ export async function handlePredict(ctx: Context): Promise<void> {
     await ctx.reply(
       `🔒 <b>Subscription Required</b>${expiredNote}\n\n` +
       `Subscribe to a plan to unlock daily football predictions:\n\n` +
-      `📅 <b>Daily</b> — ₦500 · 2 picks today\n` +
+      `📅 <b>Daily</b> — ₦500 · 2 picks now.toISOString().split('T')[0]\n` +
       `📆 <b>Weekly</b> — ₦2,500 · 4 picks/day for 7 days\n` +
       `🗓️ <b>Monthly</b> — ₦8,000 · 6 picks/day for 30 days`,
       { parse_mode: 'HTML', reply_markup: kb }
@@ -54,21 +53,28 @@ export async function handlePredict(ctx: Context): Promise<void> {
 
   const plan = PLANS[tier]
 
-  // ── Daily fetch limit check (3 fetches per day) ────────────────────────────
-  const MAX_DAILY_FETCHES = 3
-  const isSameDay   = user?.last_prediction_fetch_date === today
-  const fetchCount  = isSameDay ? (user?.prediction_fetch_count ?? 0) : 0
+  // ── Fetch limit: 2 fetches per 2-hour window ───────────────────────────────
+  // Window key format: "YYYY-MM-DD-N" where N = floor(UTC_hour / 2), giving
+  // 12 fixed slots per day (00-02, 02-04, … 22-24).
+  const MAX_WINDOW_FETCHES = 2
+  const now         = new Date()
+  const slot        = Math.floor(now.getUTCHours() / 2)
+  const windowKey   = `${now.toISOString().split('T')[0]}-${slot}`
+  const isSameWindow = user?.last_prediction_fetch_date === windowKey
+  const fetchCount   = isSameWindow ? (user?.prediction_fetch_count ?? 0) : 0
 
-  if (isSameDay && fetchCount >= MAX_DAILY_FETCHES) {
-    const midnight = new Date()
-    midnight.setUTCDate(midnight.getUTCDate() + 1)
-    midnight.setUTCHours(0, 0, 0, 0)
-    const hoursLeft  = Math.ceil((midnight.getTime() - Date.now()) / 3_600_000)
-    const resetLabel = hoursLeft === 1 ? '1 hour' : `${hoursLeft} hours`
+  if (isSameWindow && fetchCount >= MAX_WINDOW_FETCHES) {
+    // Time until the next even UTC hour
+    const nextSlot = new Date(now)
+    nextSlot.setUTCHours((slot + 1) * 2, 0, 0, 0)
+    const minsLeft   = Math.ceil((nextSlot.getTime() - now.getTime()) / 60_000)
+    const resetLabel = minsLeft <= 60
+      ? `${minsLeft} minute${minsLeft !== 1 ? 's' : ''}`
+      : `${Math.ceil(minsLeft / 60)} hour${Math.ceil(minsLeft / 60) !== 1 ? 's' : ''}`
 
     const isUpgradeable = tier === 'daily' || tier === 'weekly'
     const upgradeText   = tier === 'daily'
-      ? `\n\nWant more picks in your daily fetch?\n📆 <b>Weekly</b> — 4 picks/day · ₦2,500\n🗓️ <b>Monthly</b> — 6 picks/day · ₦8,000`
+      ? `\n\nWant more picks per fetch?\n📆 <b>Weekly</b> — 4 picks/day · ₦2,500\n🗓️ <b>Monthly</b> — 6 picks/day · ₦8,000`
       : tier === 'weekly'
       ? `\n\nWant even more picks?\n🗓️ <b>Monthly</b> — 6 picks/day · ₦8,000`
       : ''
@@ -78,9 +84,9 @@ export async function handlePredict(ctx: Context): Promise<void> {
     kb.text('🏠 Main Menu', 'cmd_start')
 
     await ctx.reply(
-      `🔒 <b>Daily fetch limit reached.</b>\n\n` +
-      `You've fetched predictions <b>${MAX_DAILY_FETCHES} times</b> today.\n` +
-      `Your fetches reset in <b>${resetLabel}</b> (midnight UTC).${upgradeText}`,
+      `🔒 <b>Fetch limit reached.</b>\n\n` +
+      `You can fetch predictions <b>twice every 2 hours</b>.\n` +
+      `Your next fetch opens in <b>${resetLabel}</b>.${upgradeText}`,
       { parse_mode: 'HTML', reply_markup: kb }
     )
     return
@@ -92,7 +98,7 @@ export async function handlePredict(ctx: Context): Promise<void> {
   await ctx.reply('⚙️ Generating predictions… this may take a moment.')
 
   try {
-    const cached = await getPredictionsByDate(today)
+    const cached = await getPredictionsByDate(now.toISOString().split('T')[0])
     const cacheAge = cached.length
       ? (Date.now() - new Date(cached[0].created_at).getTime()) / 3_600_000
       : Infinity
@@ -100,7 +106,7 @@ export async function handlePredict(ctx: Context): Promise<void> {
     let predictions = cached
 
     if (!cached.length || cacheAge > PREDICTION_CACHE_HOURS) {
-      predictions = await buildPredictions(today)
+      predictions = await buildPredictions(now.toISOString().split('T')[0])
     }
 
     const confident = predictions
@@ -108,7 +114,7 @@ export async function handlePredict(ctx: Context): Promise<void> {
       .sort((a, b) => b.winner_confidence - a.winner_confidence)
       .slice(0, matchLimit)
 
-    const chunks = formatPredictionChunks(confident, today)
+    const chunks = formatPredictionChunks(confident, now.toISOString().split('T')[0])
     for (const chunk of chunks) {
       await ctx.reply(chunk, { parse_mode: 'HTML' })
     }
@@ -131,7 +137,7 @@ export async function handlePredict(ctx: Context): Promise<void> {
     }
 
     // Record successful fetch — fire and forget so it never blocks the user
-    recordPredictionFetch(userId, today, fetchCount, !isSameDay).catch(err =>
+    recordPredictionFetch(userId, windowKey, fetchCount, !isSameWindow).catch(err =>
       logger.warn('recordPredictionFetch failed', { userId, error: String(err) })
     )
   } catch (err) {
