@@ -1,6 +1,6 @@
 import type { Context } from 'grammy'
 import { InlineKeyboard } from 'grammy'
-import { getFixturesByDate, getTeamStatistics, getHeadToHead, getStandings, findTeamStanding } from '../../football/apiClient'
+import { getFixturesByDate, getTeamStatistics, getHeadToHead } from '../../football/apiClient'
 import { MAJOR_LEAGUE_IDS, LEAGUE_TO_SPORT_KEY } from '../../football/leagues'
 import { fetchOddsMap, lookupOdds } from '../../football/oddsClient'
 import { generatePrediction } from '../../prediction/engine'
@@ -46,7 +46,7 @@ export async function handlePredict(ctx: Context): Promise<void> {
       `Subscribe to a plan to unlock daily football predictions:\n\n` +
       `📅 <b>Daily</b> — ₦500 · 2 picks today\n` +
       `📆 <b>Weekly</b> — ₦2,500 · 4 picks/day for 7 days\n` +
-      `🗓️ <b>Monthly</b> — ₦8,000 · 10 picks/day for 30 days`,
+      `🗓️ <b>Monthly</b> — ₦8,000 · 6 picks/day for 30 days`,
       { parse_mode: 'HTML', reply_markup: kb }
     )
     return
@@ -68,9 +68,9 @@ export async function handlePredict(ctx: Context): Promise<void> {
 
     const isUpgradeable = tier === 'daily' || tier === 'weekly'
     const upgradeText   = tier === 'daily'
-      ? `\n\nWant more picks in your daily fetch?\n📆 <b>Weekly</b> — 4 picks/day · ₦2,500\n🗓️ <b>Monthly</b> — 10 picks/day · ₦8,000`
+      ? `\n\nWant more picks in your daily fetch?\n📆 <b>Weekly</b> — 4 picks/day · ₦2,500\n🗓️ <b>Monthly</b> — 6 picks/day · ₦8,000`
       : tier === 'weekly'
-      ? `\n\nWant even more picks?\n🗓️ <b>Monthly</b> — 10 picks/day · ₦8,000`
+      ? `\n\nWant even more picks?\n🗓️ <b>Monthly</b> — 6 picks/day · ₦8,000`
       : ''
 
     const kb = new InlineKeyboard()
@@ -140,9 +140,16 @@ export async function handlePredict(ctx: Context): Promise<void> {
   }
 }
 
+// API-Football free tier: 10 req/min. Standings take 8 calls alone, leaving only 2
+// for fixture stats. Skipping standings (engine returns neutral 0.5 when null) lets
+// us process 5 fixtures within the 60-second serverless limit.
+const MAX_FIXTURES_PER_BUILD = 5
+
 export async function buildPredictions(date: string) {
   const fixtures = await getFixturesByDate(date)
-  const filtered = fixtures.filter(f => MAJOR_LEAGUE_IDS.includes(f.league.id))
+  const filtered = fixtures
+    .filter(f => MAJOR_LEAGUE_IDS.includes(f.league.id))
+    .slice(0, MAX_FIXTURES_PER_BUILD)
 
   // --- Market odds (The Odds API) ---
   const sportKeys = [...new Set(
@@ -150,21 +157,7 @@ export async function buildPredictions(date: string) {
   )] as string[]
   const oddsMap = await fetchOddsMap(sportKeys)
 
-  // --- Standings (statistical fallback) ---
-  const leagueIds = [...new Set(filtered.map(f => f.league.id))]
-  const standingsMap = new Map<number, Awaited<ReturnType<typeof getStandings>>>()
-
-  for (const leagueId of leagueIds) {
-    try {
-      const season = filtered.find(f => f.league.id === leagueId)!.league.season
-      standingsMap.set(leagueId, await getStandings(leagueId, season))
-    } catch {
-      standingsMap.set(leagueId, [])
-    }
-    await sleep(API_CALL_DELAY_MS)
-  }
-
-  // --- Per-fixture prediction ---
+  // --- Per-fixture prediction (sequential to respect 10 req/min rate limit) ---
   for (const fixture of filtered) {
     try {
       const season      = fixture.league.season
@@ -173,22 +166,22 @@ export async function buildPredictions(date: string) {
 
       const marketOdds = lookupOdds(fixture.teams.home.name, fixture.teams.away.name, oddsMap)
 
-      // Always fetch team stats — needed for Over/Under and BTTS regardless of odds source
-      const [homeStats, awayStats] = await Promise.all([
-        getTeamStatistics(fixture.teams.home.id, fixture.league.id, season),
-        getTeamStatistics(fixture.teams.away.id, fixture.league.id, season),
-      ])
+      // Sequential calls — parallel would exceed the 10 req/min free-tier limit
+      const homeStats = await getTeamStatistics(fixture.teams.home.id, fixture.league.id, season)
+      await sleep(API_CALL_DELAY_MS)
+      const awayStats = await getTeamStatistics(fixture.teams.away.id, fixture.league.id, season)
+      await sleep(API_CALL_DELAY_MS)
 
       // H2H only needed for statistical 1X2 — skip when market odds are available
       const h2h = marketOdds
         ? []
         : await getHeadToHead(fixture.teams.home.id, fixture.teams.away.id, 5)
 
-      await sleep(API_CALL_DELAY_MS)
+      if (!marketOdds) await sleep(API_CALL_DELAY_MS)
 
-      const standings    = standingsMap.get(fixture.league.id) ?? []
-      const homeStanding = findTeamStanding(standings, fixture.teams.home.id)
-      const awayStanding = findTeamStanding(standings, fixture.teams.away.id)
+      // Standings skipped — engine returns neutral 0.5 when null, saving 8 API calls per build
+      const homeStanding = undefined
+      const awayStanding = undefined
 
       // Stats prediction always runs — used for O/U and BTTS
       const statsResult = generatePrediction({ fixture, homeStats, awayStats, h2h, homeStanding, awayStanding })
