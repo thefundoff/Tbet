@@ -6,7 +6,6 @@ export function buildMainMenuKeyboard(): InlineKeyboard {
     .text('🔮 Predictions',   'cmd_predict')
     .row()
     .text('📊 Results',       'cmd_results')
-    .text('📈 Stats',         'cmd_stats')
     .row()
     .text('💳 My Plan',       'my_plan')
     .text('💎 View Plans',    'plans')

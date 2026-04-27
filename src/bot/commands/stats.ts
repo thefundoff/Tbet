@@ -2,6 +2,11 @@ import type { Context } from 'grammy'
 import { getAccuracyStats } from '../../db/predictions'
 import { logger } from '../../utils/logger'
 
+function isAdmin(userId: number): boolean {
+  return (process.env.ADMIN_TELEGRAM_ID ?? '')
+    .split(',').map(s => parseInt(s.trim(), 10)).includes(userId)
+}
+
 function pct(correct: number, total: number): string {
   if (total === 0) return 'N/A'
   return `${Math.round((correct / total) * 100)}%`
@@ -14,6 +19,9 @@ function bar(correct: number, total: number): string {
 }
 
 export async function handleStats(ctx: Context): Promise<void> {
+  const userId = ctx.from?.id
+  if (!userId || !isAdmin(userId)) return
+
   try {
     const s = await getAccuracyStats()
 
