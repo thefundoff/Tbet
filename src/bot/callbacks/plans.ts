@@ -12,7 +12,9 @@ import { handlePredict } from '../commands/predict'
 import { handleResults } from '../commands/results'
 import { handleStats }   from '../commands/stats'
 import { buildAndSendSlip } from '../commands/slip'
-import { handleInvite } from '../commands/invite'
+import { handleInvite }   from '../commands/invite'
+import { handleSupport }  from '../commands/support'
+import { buildMainMenuKeyboard } from '../keyboards'
 
 // ── Shared helper ────────────────────────────────────────────────────────────
 
@@ -348,30 +350,17 @@ export async function handleCommandButton(ctx: Context, command: string): Promis
       `I analyse real football matches and generate statistical predictions powered by market odds and AI modelling.\n\n` +
       `<b>What would you like to do?</b>`
 
-    const kb = new InlineKeyboard()
-      .text('⚽ Matches',     'cmd_matches')
-      .text('🔮 Predictions', 'cmd_predict')
-      .row()
-      .text('📊 Results',     'cmd_results')
-      .text('📈 Stats',       'cmd_stats')
-      .row()
-      .text('💳 My Plan',     'my_plan')
-      .text('💎 View Plans',  'plans')
-      .row()
-      .text('👥 Invite Friends', 'cmd_invite')
-
-    await editOrReply(ctx, text, { parse_mode: 'HTML', reply_markup: kb })
+    await editOrReply(ctx, text, { parse_mode: 'HTML', reply_markup: buildMainMenuKeyboard() })
     return
   }
 
-  // For commands that trigger heavy handlers, answer the callback first
-  // then call the handler — the handler sends its own reply message
   switch (command) {
     case 'matches': return handleMatches(ctx)
     case 'predict': return handlePredict(ctx)
     case 'results': return handleResults(ctx)
     case 'stats':   return handleStats(ctx)
     case 'invite':  return handleInvite(ctx)
+    case 'support': return handleSupport(ctx)
   }
 }
 
@@ -512,7 +501,8 @@ export async function handlePlanCallback(ctx: Context, data: string): Promise<vo
     if (data === 'cancel_plan_confirm') return showCancelConfirmation(ctx)
     if (data === 'cancel_plan_execute') return executeCancelPlan(ctx)
     if (data === 'safe_games')          return showSafeGames(ctx)
-    if (data === 'show_slip')  return buildAndSendSlip(ctx)
+    if (data === 'show_slip')           return buildAndSendSlip(ctx)
+    if (data === 'show_support')        return handleSupport(ctx)
 
     if (data === 'redeem_info') {
       const kb = new InlineKeyboard().text('⬅️ Back to Plans', 'plans')
