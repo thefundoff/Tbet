@@ -1,5 +1,7 @@
 import { Bot, InlineKeyboard } from 'grammy'
 import { userSyncMiddleware } from './middleware/userSync'
+import { termsGuardMiddleware } from './middleware/termsGuard'
+import { handleTermsAccept, handleTermsDecline } from './callbacks/terms'
 import { handleStart }       from './commands/start'
 import { handleMatches }     from './commands/matches'
 import { handlePredict }     from './commands/predict'
@@ -38,6 +40,7 @@ export function createBot(): Bot {
   const bot = new Bot(token)
 
   bot.use(userSyncMiddleware)
+  bot.use(termsGuardMiddleware)
 
   // ── Slash commands ───────────────────────────────────────────────────────────
   bot.command('start',       handleStart)
@@ -54,6 +57,16 @@ export function createBot(): Bot {
   bot.command('gencode',     handleGencode)   // admin only — not in BOT_COMMANDS
 
   // ── Inline keyboard callbacks ─────────────────────────────────────────────────
+
+  // Terms callbacks are handled before the general router (middleware already allowed them through)
+  bot.callbackQuery(/^terms_/, async ctx => {
+    await ctx.answerCallbackQuery()
+    if (ctx.callbackQuery.data === 'terms_decline') {
+      return handleTermsDecline(ctx)
+    }
+    return handleTermsAccept(ctx)  // handles both "terms_accept" and "terms_accept:ref_..."
+  })
+
   bot.callbackQuery(/.*/, async ctx => {
     await ctx.answerCallbackQuery()
     await handlePlanCallback(ctx, ctx.callbackQuery.data)

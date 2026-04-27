@@ -14,6 +14,8 @@ export interface User {
   referred_by: number | null
   referral_credit: number
   referral_reward_claimed: boolean
+  agreed_to_terms: boolean
+  agreed_at: string | null
   created_at: string
   updated_at: string
 }
@@ -190,5 +192,20 @@ export async function getReferralStats(referrerId: number): Promise<{ joined: nu
   return {
     joined: joinedRes.count ?? 0,
     paid:   paidRes.count   ?? 0,
+  }
+}
+
+export async function agreeToTerms(userId: number): Promise<void> {
+  const db = getSupabaseClient()
+  const now = new Date().toISOString()
+  const { error } = await db
+    .from('users')
+    .upsert(
+      { id: userId, agreed_to_terms: true, agreed_at: now, updated_at: now },
+      { onConflict: 'id', ignoreDuplicates: false }
+    )
+  if (error) {
+    logger.error('agreeToTerms failed', { userId, error: error.message })
+    throw error
   }
 }
