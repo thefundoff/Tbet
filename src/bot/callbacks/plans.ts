@@ -6,12 +6,13 @@ import { getUserById, setUserPlan, setSubscription, cancelUserPlan } from '../..
 import { getPredictionsByDate, hasAnyWrongPredictionOnDate, countLosingDays } from '../../db/predictions'
 import { formatPredictionChunks } from '../../prediction/formatter'
 import { logger } from '../../utils/logger'
-import { SAFE_CONFIDENCE_THRESHOLD, SAFE_GAME_COUNT } from '../../utils/constants'
+import { SAFE_CONFIDENCE_THRESHOLD, SAFE_GAME_COUNT, REFERRAL_INVITEE_DISCOUNT, REFERRAL_INVITER_CREDIT } from '../../utils/constants'
 import { handleMatches } from '../commands/matches'
 import { handlePredict } from '../commands/predict'
 import { handleResults } from '../commands/results'
 import { handleStats }   from '../commands/stats'
 import { buildAndSendSlip } from '../commands/slip'
+import { handleInvite } from '../commands/invite'
 
 // ── Shared helper ────────────────────────────────────────────────────────────
 
@@ -145,6 +146,28 @@ export async function showPurchaseConfirmation(ctx: Context, tier: Exclude<PlanT
     // Non-fatal — proceed without discount
   }
 
+  // ── Invitee discount (₦200 off first plan for users who joined via invite link) ─
+  // Reuse the user fetched inside the compensation block above; fetch fresh if needed
+  let _user2: Awaited<ReturnType<typeof getUserById>> | null = null
+  try {
+    _user2 = await getUserById(userId)
+  } catch { /* ignore */ }
+
+  if (_user2?.referred_by && !_user2.referral_reward_claimed) {
+    discount     += REFERRAL_INVITEE_DISCOUNT
+    discountNote += `\n🎁 <b>Invite discount:</b> -₦${REFERRAL_INVITEE_DISCOUNT} for joining via a referral link`
+  }
+
+  // ── Inviter's referral credit redemption ─────────────────────────────────────
+  const creditToApply = Math.min(
+    _user2?.referral_credit ?? 0,
+    Math.max(0, plan.priceNGN - discount - 200),  // keep at least ₦200 payable
+  )
+  if (creditToApply > 0) {
+    discount     += creditToApply
+    discountNote += `\n💰 <b>Referral credit:</b> -₦${creditToApply} applied from your balance`
+  }
+
   const finalAmount = plan.priceNGN - discount
 
   // ── Flutterwave payment init ─────────────────────────────────────────────────
@@ -165,7 +188,7 @@ export async function showPurchaseConfirmation(ctx: Context, tier: Exclude<PlanT
           email: `user${userId}@tbet.app`,
           name:  ctx.from?.first_name ?? 'Tbet User',
         },
-        meta: { telegram_user_id: userId, plan_tier: tier },
+        meta: { telegram_user_id: userId, plan_tier: tier, referral_credit_applied: creditToApply },
         customizations: {
           title:       'Tbet Subscription',
           description: `${plan.name} Plan — ${plan.matchLimit} pick${plan.matchLimit > 1 ? 's' : ''}/day`,
@@ -334,6 +357,8 @@ export async function handleCommandButton(ctx: Context, command: string): Promis
       .row()
       .text('💳 My Plan',     'my_plan')
       .text('💎 View Plans',  'plans')
+      .row()
+      .text('👥 Invite Friends', 'cmd_invite')
 
     await editOrReply(ctx, text, { parse_mode: 'HTML', reply_markup: kb })
     return
@@ -346,6 +371,7 @@ export async function handleCommandButton(ctx: Context, command: string): Promis
     case 'predict': return handlePredict(ctx)
     case 'results': return handleResults(ctx)
     case 'stats':   return handleStats(ctx)
+    case 'invite':  return handleInvite(ctx)
   }
 }
 

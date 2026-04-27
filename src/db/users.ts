@@ -11,6 +11,9 @@ export interface User {
   plan_expires_at: string | null
   last_prediction_fetch_date: string | null
   prediction_fetch_count: number
+  referred_by: number | null
+  referral_credit: number
+  referral_reward_claimed: boolean
   created_at: string
   updated_at: string
 }
@@ -133,4 +136,59 @@ export async function getUserById(userId: number): Promise<User | null> {
     return null
   }
   return data as User | null
+}
+
+export async function setReferredBy(userId: number, referredBy: number): Promise<void> {
+  const db = getSupabaseClient()
+  const { error } = await db
+    .from('users')
+    .update({ referred_by: referredBy, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+    .is('referred_by', null)  // only set if not already set
+  if (error) {
+    logger.error('setReferredBy failed', { userId, referredBy, error: error.message })
+  }
+}
+
+export async function addReferralCredit(userId: number, amount: number): Promise<void> {
+  const db = getSupabaseClient()
+  const { data } = await db.from('users').select('referral_credit').eq('id', userId).maybeSingle()
+  const current = (data as { referral_credit: number } | null)?.referral_credit ?? 0
+  const { error } = await db
+    .from('users')
+    .update({ referral_credit: Math.max(0, current + amount), updated_at: new Date().toISOString() })
+    .eq('id', userId)
+  if (error) {
+    logger.error('addReferralCredit failed', { userId, amount, error: error.message })
+    throw error
+  }
+}
+
+export async function markReferralRewardClaimed(userId: number): Promise<void> {
+  const db = getSupabaseClient()
+  const { error } = await db
+    .from('users')
+    .update({ referral_reward_claimed: true, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+  if (error) {
+    logger.error('markReferralRewardClaimed failed', { userId, error: error.message })
+    throw error
+  }
+}
+
+export async function getReferralStats(referrerId: number): Promise<{ joined: number; paid: number }> {
+  const db = getSupabaseClient()
+
+  const [joinedRes, paidRes] = await Promise.all([
+    db.from('users').select('id', { count: 'exact', head: true }).eq('referred_by', referrerId),
+    db.from('users').select('id', { count: 'exact', head: true }).eq('referred_by', referrerId).eq('referral_reward_claimed', true),
+  ])
+
+  if (joinedRes.error) logger.warn('getReferralStats: joined count failed', { referrerId, error: joinedRes.error.message })
+  if (paidRes.error)   logger.warn('getReferralStats: paid count failed',   { referrerId, error: paidRes.error.message })
+
+  return {
+    joined: joinedRes.count ?? 0,
+    paid:   paidRes.count   ?? 0,
+  }
 }

@@ -1,9 +1,10 @@
 ﻿import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { Bot } from 'grammy'
-import { getUserById, setUserPlan, setSubscription } from '../src/db/users'
+import { getUserById, setUserPlan, setSubscription, addReferralCredit, markReferralRewardClaimed } from '../src/db/users'
 import { PLANS, getActivePlanTier } from '../src/utils/plans'
 import type { PlanTier } from '../src/utils/plans'
 import { logger } from '../src/utils/logger'
+import { REFERRAL_INVITER_CREDIT } from '../src/utils/constants'
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method !== 'POST') {
@@ -93,12 +94,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     logger.info('Flutterwave webhook: plan activated', { userId, tier, expiresAt: expiresAt.toISOString() })
 
+    // ── Referral rewards ────────────────────────────────────────────────────────
+    const meta         = payload?.data?.meta ?? payload?.meta ?? {}
+    const creditApplied = parseInt(meta?.referral_credit_applied ?? '0', 10) || 0
+
+    const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN!)
+
+    // Deduct referral credit that was applied to this payment
+    if (creditApplied > 0) {
+      try {
+        await addReferralCredit(userId, -creditApplied)
+        logger.info('Flutterwave webhook: referral credit deducted', { userId, creditApplied })
+      } catch (err) {
+        logger.warn('Flutterwave webhook: credit deduction failed', { userId, error: String(err) })
+      }
+    }
+
+    // Credit the inviter when this user completes their first paid subscription
+    const freshUser = await getUserById(userId)
+    if (freshUser?.referred_by && !freshUser.referral_reward_claimed) {
+      const referrerId = freshUser.referred_by
+      try {
+        await addReferralCredit(referrerId, REFERRAL_INVITER_CREDIT)
+        await markReferralRewardClaimed(userId)
+
+        const inviter    = await getUserById(referrerId)
+        const newBalance = inviter?.referral_credit ?? REFERRAL_INVITER_CREDIT
+
+        await bot.api.sendMessage(
+          referrerId,
+          `🎉 <b>Referral Reward!</b>\n\n` +
+          `Someone you invited just subscribed to Tbet!\n\n` +
+          `💰 You earned <b>₦${REFERRAL_INVITER_CREDIT}</b> credit.\n` +
+          `💳 Available credit: <b>₦${newBalance.toLocaleString()}</b>\n\n` +
+          `<i>Your credit will be applied automatically to your next subscription.</i>`,
+          { parse_mode: 'HTML' }
+        )
+        logger.info('Flutterwave webhook: inviter credited', { referrerId, userId, amount: REFERRAL_INVITER_CREDIT })
+      } catch (err) {
+        logger.warn('Flutterwave webhook: inviter credit failed', { referrerId, userId, error: String(err) })
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────────
+
     // Notify the user in Telegram
     const expLabel = expiresAt.toLocaleDateString('en-GB', {
       weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
     })
 
-    const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN!)
     await bot.api.sendMessage(
       userId,
       `🎉 <b>Payment Confirmed!</b>\n\n` +

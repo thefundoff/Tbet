@@ -19,3 +19,6 @@ export const WEIGHT_MIN                = 0.05
 export const WEIGHT_MAX                = 0.50
 export const LEARNING_RATE             = 0.3
 export const LEARNING_MIN_IMPROVEMENT  = 0.01
+
+export const REFERRAL_INVITER_CREDIT   = 200  // ₦ earned by inviter per paid referral
+export const REFERRAL_INVITEE_DISCOUNT = 200  // ₦ off the invitee's first plan

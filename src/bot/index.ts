@@ -11,6 +11,7 @@ import { handlePlanCallback } from './callbacks/plans'
 import { handleRedeem }       from './commands/redeem'
 import { handleGencode }      from './commands/gencode'
 import { handleSlip }         from './commands/slip'
+import { handleInvite }       from './commands/invite'
 
 export const BOT_COMMANDS = [
   { command: 'start',       description: 'Welcome message and main menu' },
@@ -23,6 +24,7 @@ export const BOT_COMMANDS = [
   { command: 'redeem',      description: 'Redeem a promo code — /redeem YOUR-CODE' },
   { command: 'subscribe',   description: 'View subscription plans' },
   { command: 'unsubscribe', description: 'Stop daily prediction notifications' },
+  { command: 'invite',      description: 'Get your referral link — earn ₦200 per friend who subscribes' },
 ]
 
 let botInstance: Bot | null = null
@@ -48,6 +50,7 @@ export function createBot(): Bot {
   bot.command('redeem',      handleRedeem)
   bot.command('subscribe',   handleSubscribe)
   bot.command('unsubscribe', handleUnsubscribe)
+  bot.command('invite',      handleInvite)
   bot.command('gencode',     handleGencode)   // admin only — not in BOT_COMMANDS
 
   // ── Inline keyboard callbacks ─────────────────────────────────────────────────

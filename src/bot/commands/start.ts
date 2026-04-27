@@ -1,8 +1,10 @@
 import type { Context } from 'grammy'
 import { InlineKeyboard } from 'grammy'
+import { getUserById, setReferredBy } from '../../db/users'
 
 export async function handleStart(ctx: Context): Promise<void> {
-  const name = ctx.from?.first_name ?? 'there'
+  const userId = ctx.from?.id
+  const name   = ctx.from?.first_name ?? 'there'
 
   const keyboard = new InlineKeyboard()
     .text('⚽ Matches',     'cmd_matches')
@@ -13,6 +15,8 @@ export async function handleStart(ctx: Context): Promise<void> {
     .row()
     .text('💳 My Plan',     'my_plan')
     .text('💎 View Plans',  'plans')
+    .row()
+    .text('👥 Invite Friends', 'cmd_invite')
 
   await ctx.reply(
     `👋 <b>Welcome, ${name}!</b>\n\n` +
@@ -20,4 +24,16 @@ export async function handleStart(ctx: Context): Promise<void> {
     `<b>What would you like to do?</b>`,
     { parse_mode: 'HTML', reply_markup: keyboard }
   )
+
+  // Handle referral deep-link: /start ref_12345678
+  const payload = typeof ctx.match === 'string' ? ctx.match.trim() : ''
+  if (userId && payload.startsWith('ref_')) {
+    const referrerId = parseInt(payload.slice(4), 10)
+    if (!isNaN(referrerId) && referrerId !== userId) {
+      const self = await getUserById(userId)
+      if (!self?.referred_by) {
+        await setReferredBy(userId, referrerId)
+      }
+    }
+  }
 }
