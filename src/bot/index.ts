@@ -15,6 +15,7 @@ import { handleGencode }      from './commands/gencode'
 import { handleSlip }         from './commands/slip'
 import { handleInvite }       from './commands/invite'
 import { handleSupport }      from './commands/support'
+import { handleBroadcast }    from './commands/broadcast'
 
 export const BOT_COMMANDS = [
   { command: 'start',       description: 'Welcome message and main menu' },
@@ -57,6 +58,7 @@ export function createBot(): Bot {
   bot.command('unsubscribe', handleUnsubscribe)
   bot.command('invite',      handleInvite)
   bot.command('support',     handleSupport)
+  bot.command('broadcast',   handleBroadcast) // admin only — not in BOT_COMMANDS
   bot.command('gencode',     handleGencode)   // admin only — not in BOT_COMMANDS
 
   // ── Inline keyboard callbacks ─────────────────────────────────────────────────
