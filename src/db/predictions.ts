@@ -146,6 +146,36 @@ export async function resolvePredictions(
   return resolved
 }
 
+export async function hasAnyWrongPredictionOnDate(date: string): Promise<boolean> {
+  const db = getSupabaseClient()
+  const { count, error } = await db
+    .from('predictions')
+    .select('id', { count: 'exact', head: true })
+    .eq('match_date', date)
+    .eq('was_correct', false)
+  if (error) {
+    logger.error('hasAnyWrongPredictionOnDate failed', { date, error: error.message })
+    return false
+  }
+  return (count ?? 0) > 0
+}
+
+export async function countLosingDays(startDate: string, endDate: string): Promise<number> {
+  const db = getSupabaseClient()
+  const { data, error } = await db
+    .from('predictions')
+    .select('match_date')
+    .gte('match_date', startDate)
+    .lte('match_date', endDate)
+    .eq('was_correct', false)
+  if (error) {
+    logger.error('countLosingDays failed', { startDate, endDate, error: error.message })
+    return 0
+  }
+  const uniqueDates = new Set((data ?? []).map(r => (r as { match_date: string }).match_date))
+  return uniqueDates.size
+}
+
 export interface AccuracyStats {
   total: number
   correct: number

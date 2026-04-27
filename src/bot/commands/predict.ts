@@ -179,12 +179,9 @@ export async function buildPredictions(date: string) {
 
       if (!marketOdds) await sleep(API_CALL_DELAY_MS)
 
-      // Standings skipped — engine returns neutral 0.5 when null, saving 8 API calls per build
-      const homeStanding = undefined
-      const awayStanding = undefined
-
       // Stats prediction always runs — used for O/U and BTTS
-      const statsResult = await generatePrediction({ fixture, homeStats, awayStats, h2h, homeStanding, awayStanding })
+      // Standings skipped (null = neutral 0.5 in engine), saving 8 API calls per build
+      const statsResult = await generatePrediction({ fixture, homeStats, awayStats, h2h, homeStanding: null, awayStanding: null })
 
       // 1X2: prefer market odds, fall back to statistical
       let homeProbability: number

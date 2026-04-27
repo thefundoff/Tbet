@@ -3,7 +3,7 @@ import { InlineKeyboard } from 'grammy'
 import { PLANS, getActivePlanTier } from '../../utils/plans'
 import type { PlanTier } from '../../utils/plans'
 import { getUserById, setUserPlan, setSubscription, cancelUserPlan } from '../../db/users'
-import { getPredictionsByDate } from '../../db/predictions'
+import { getPredictionsByDate, hasAnyWrongPredictionOnDate, countLosingDays } from '../../db/predictions'
 import { formatPredictionChunks } from '../../prediction/formatter'
 import { logger } from '../../utils/logger'
 import { SAFE_CONFIDENCE_THRESHOLD, SAFE_GAME_COUNT } from '../../utils/constants'
@@ -101,9 +101,53 @@ export async function showPurchaseConfirmation(ctx: Context, tier: Exclude<PlanT
   const txRef   = `tbet-${userId}-${tier}-${Date.now()}`
   const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : ''
 
-  // Show spinner while we hit the Flutterwave API
+  // Show spinner while we compute discount + hit the Flutterwave API
   await editOrReply(ctx, '⏳ Preparing your payment link…', { parse_mode: 'HTML' })
 
+  // ── Compensation discount ────────────────────────────────────────────────────
+  let discount    = 0
+  let discountNote = ''
+
+  try {
+    const user = await getUserById(userId)
+
+    // Only apply when renewing the exact same tier after it expired
+    if (
+      user?.plan === tier &&
+      user.plan_expires_at &&
+      new Date(user.plan_expires_at) <= new Date()
+    ) {
+      const expiredAt    = new Date(user.plan_expires_at)
+      const msPerDay     = 24 * 60 * 60 * 1000
+      const expiredDaysAgo = (Date.now() - expiredAt.getTime()) / msPerDay
+
+      if (tier === 'daily' && expiredDaysAgo <= 2) {
+        // Subscription date = plan_expires_at − 1 day (the day they used predictions)
+        const subDate = new Date(expiredAt.getTime() - msPerDay).toISOString().split('T')[0]
+        const hadLoss = await hasAnyWrongPredictionOnDate(subDate)
+        if (hadLoss) {
+          discount     = 300
+          discountNote = `\n\n🎁 <b>Compensation discount:</b> -₦300 applied for yesterday's loss`
+        }
+      } else if (tier === 'weekly' && expiredDaysAgo <= 7) {
+        // Subscription period: [plan_expires_at − 7 days, plan_expires_at − 1 day]
+        const startDate = new Date(expiredAt.getTime() - 7 * msPerDay).toISOString().split('T')[0]
+        const endDate   = new Date(expiredAt.getTime() - msPerDay).toISOString().split('T')[0]
+        const losingDays = await countLosingDays(startDate, endDate)
+        if (losingDays > 0) {
+          discount     = Math.min(losingDays * 200, 2300) // floor at ₦200 payment
+          discountNote = `\n\n🎁 <b>Compensation discount:</b> -₦${discount} for ${losingDays} losing day${losingDays > 1 ? 's' : ''} last week`
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn('showPurchaseConfirmation: discount check failed', { userId, error: String(err) })
+    // Non-fatal — proceed without discount
+  }
+
+  const finalAmount = plan.priceNGN - discount
+
+  // ── Flutterwave payment init ─────────────────────────────────────────────────
   let paymentLink: string
   try {
     const res = await fetch('https://api.flutterwave.com/v3/payments', {
@@ -114,7 +158,7 @@ export async function showPurchaseConfirmation(ctx: Context, tier: Exclude<PlanT
       },
       body: JSON.stringify({
         tx_ref:       txRef,
-        amount:       plan.priceNGN,
+        amount:       finalAmount,
         currency:     'NGN',
         redirect_url: `${baseUrl}/api/payment-complete`,
         customer: {
@@ -150,18 +194,22 @@ export async function showPurchaseConfirmation(ctx: Context, tier: Exclude<PlanT
     weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
   })
 
+  const priceDisplay = discount > 0
+    ? `<s>${plan.price}</s> → <b>₦${finalAmount.toLocaleString()}</b>`
+    : `<b>${plan.price}</b>`
+
   const text =
     `🧾 <b>Order Summary</b>\n\n` +
     `Plan:      ${plan.emoji} ${plan.name}\n` +
-    `Price:     <b>${plan.price}</b>\n` +
+    `Price:     ${priceDisplay}\n` +
     `Access:    ${plan.durationDays === 1 ? 'Today only' : `${plan.durationDays} days`}\n` +
     `Expires:   ${expLabel}\n` +
-    `Picks/day: <b>${plan.matchLimit}</b>\n\n` +
+    `Picks/day: <b>${plan.matchLimit}</b>${discountNote}\n\n` +
     `Tap the button below to pay securely via Flutterwave.\n` +
     `<i>Your plan activates automatically once payment is confirmed.</i>`
 
   const kb = new InlineKeyboard()
-    .url(`💳 Pay ${plan.price} Now`, paymentLink)
+    .url(`💳 Pay ₦${finalAmount.toLocaleString()} Now`, paymentLink)
     .row()
     .text('❌ Cancel', `plan_${tier}`)
 
