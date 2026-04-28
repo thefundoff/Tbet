@@ -56,7 +56,7 @@ export async function handlePredict(ctx: Context): Promise<void> {
   // ── Fetch limit: 2 fetches per 2-hour window ───────────────────────────────
   // Window key format: "YYYY-MM-DD-N" where N = floor(UTC_hour / 2), giving
   // 12 fixed slots per day (00-02, 02-04, … 22-24).
-  const MAX_WINDOW_FETCHES = 2
+  const MAX_WINDOW_FETCHES = 5
   const now         = new Date()
   const slot        = Math.floor(now.getUTCHours() / 2)
   const windowKey   = `${now.toISOString().split('T')[0]}-${slot}`
@@ -85,7 +85,7 @@ export async function handlePredict(ctx: Context): Promise<void> {
 
     await ctx.reply(
       `🔒 <b>Fetch limit reached.</b>\n\n` +
-      `You can fetch predictions <b>twice every 2 hours</b>.\n` +
+      `You can fetch predictions <b>5 times every 2 hours</b>.\n` +
       `Your next fetch opens in <b>${resetLabel}</b>.${upgradeText}`,
       { parse_mode: 'HTML', reply_markup: kb }
     )
@@ -113,6 +113,15 @@ export async function handlePredict(ctx: Context): Promise<void> {
       .filter(p => p.winner_confidence >= MIN_PREDICTION_CONFIDENCE)
       .sort((a, b) => b.winner_confidence - a.winner_confidence)
       .slice(0, matchLimit)
+
+    if (confident.length === 0) {
+      await ctx.reply(
+        '⚠️ <b>No predictions available yet.</b>\n\n' +
+        'Our data providers are still loading fixtures for today. Please try again in a few minutes.',
+        { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('🏠 Main Menu', 'cmd_start') }
+      )
+      return
+    }
 
     const chunks = formatPredictionChunks(confident, now.toISOString().split('T')[0])
     for (const chunk of chunks) {
@@ -146,10 +155,9 @@ export async function handlePredict(ctx: Context): Promise<void> {
   }
 }
 
-// API-Football free tier: 10 req/min. Standings take 8 calls alone, leaving only 2
-// for fixture stats. Skipping standings (engine returns neutral 0.5 when null) lets
-// us process 5 fixtures within the 60-second serverless limit.
-const MAX_FIXTURES_PER_BUILD = 5
+// API-Football free tier: 10 req/min. 3 fixtures × 2 stats calls × 6s delay ≈ 42s,
+// comfortably within Vercel's 60-second serverless limit.
+const MAX_FIXTURES_PER_BUILD = 3
 
 export async function buildPredictions(date: string) {
   const fixtures = await getFixturesByDate(date)
