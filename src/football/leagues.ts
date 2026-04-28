@@ -28,10 +28,54 @@ export const MAJOR_LEAGUE_IDS: number[] = [
   144,  // Jupiler Pro League
   // Scotland
   179,  // Premiership
+  // Greece
+  197,  // Super League
+  // Russia
+  235,  // Premier League
+  // Austria
+  218,  // Bundesliga
+  // Switzerland
+  207,  // Super League
+  // Denmark
+  119,  // Superliga
+  // Sweden
+  113,  // Allsvenskan
+  // Norway
+  103,  // Eliteserien
+  // Poland
+  106,  // Ekstraklasa
+  // Czech Republic
+  345,  // Czech Liga
+  // Romania
+  283,  // Liga 1
+  // Croatia
+  210,  // HNL
+  // Serbia
+  286,  // Super Liga
+  // Ukraine
+  333,  // Premier League
   // UEFA
   2,    // UEFA Champions League
   3,    // UEFA Europa League
   848,  // UEFA Europa Conference League
+  // South America
+  13,   // Copa Libertadores
+  11,   // Copa Sudamericana
+  71,   // Brazil Série A
+  72,   // Brazil Série B
+  128,  // Argentina Primera División
+  129,  // Argentina Primera División B
+  // North America
+  253,  // MLS (USA)
+  262,  // Liga MX (Mexico)
+  // Africa
+  6,    // Africa Cup of Nations
+  12,   // CAF Champions League
+  29,   // CAF Confederation Cup
+  // Asia
+  17,   // AFC Champions League
+  // Saudi Arabia
+  307,  // Saudi Pro League
   // World
   1,    // World Cup
   4,    // Euro Championship
