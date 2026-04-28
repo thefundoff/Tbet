@@ -35,23 +35,17 @@ function formatMatch(row: PredictionRow): string {
       } (+${row.value_edge}% edge vs market)</b>`
     : null
 
-  const inputs = row.algorithm_inputs as Record<string, unknown> | null
-  const hasStatsData = inputs?.homeForm !== null || inputs?.awayForm !== null
   const isRisky = row.winner_confidence <= 40
 
-  const ouLine = hasStatsData
-    ? [
-        `📈 Over/Under 2.5: <b>${row.over_under_prediction === 'over' ? 'Over ↑' : 'Under ↓'}</b>`,
-        `   ${confidenceBar(Math.round(row.over_under_confidence))}`,
-      ]
-    : [`📈 Over/Under 2.5: <i>Insufficient team data</i>`]
+  const ouLine = [
+    `📈 Over/Under 2.5: <b>${row.over_under_prediction === 'over' ? 'Over ↑' : 'Under ↓'}</b>`,
+    `   ${confidenceBar(Math.round(row.over_under_confidence))}`,
+  ]
 
-  const bttsLine = hasStatsData
-    ? [
-        `🔁 Both Teams Score: <b>${row.btts_prediction ? 'Yes ✅' : 'No ❌'}</b>`,
-        `   ${confidenceBar(Math.round(row.btts_confidence))}`,
-      ]
-    : [`🔁 Both Teams Score: <i>Insufficient team data</i>`]
+  const bttsLine = [
+    `🔁 Both Teams Score: <b>${row.btts_prediction ? 'Yes ✅' : 'No ❌'}</b>`,
+    `   ${confidenceBar(Math.round(row.btts_confidence))}`,
+  ]
 
   return [
     `⚽ <b>${row.home_team} vs ${row.away_team}</b>`,

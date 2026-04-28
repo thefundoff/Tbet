@@ -69,6 +69,37 @@ Generates single-use promo codes that give free plan access. Useful for promotio
 
 ---
 
+## `/refreshpredictions`
+
+Clears today's cached predictions from the database. Use this whenever you change prediction settings (match limits, confidence thresholds, etc.) mid-day and want users to immediately get fresh predictions instead of waiting up to 12 hours for the cache to expire.
+
+**Usage:**
+```
+/refreshpredictions
+```
+
+**What it does:**
+- Deletes all rows in the `predictions` table where `match_date = today`
+- The next user to run `/predict` triggers a fresh build using the current configuration
+- Safe to run at any time — it only affects today's cache, not historical data
+
+---
+
+## System Changes Log
+
+### April 2026 Update
+- **Matches coverage expanded:** `MAJOR_LEAGUE_IDS` now covers 50+ leagues across Europe, South America, North America, Africa, Asia, and the Middle East (was ~20 European-only leagues)
+- **API plan upgraded to Pro:** `API_CALL_DELAY_MS` reduced from 6000ms → 200ms; `MAX_FIXTURES_PER_BUILD` raised from 3 → 20
+- **Plan pick limits increased:**
+  - Daily: 2 → 4 picks/day
+  - Weekly: 4 → 7 picks/day
+  - Monthly: 6 → 11 picks/day
+- **League priority ordering added:** Fixtures are now sorted by `LEAGUE_PRIORITY` before processing, ensuring UEFA and European top flights (with the best API-Football data coverage) fill the build slots first
+- **Over/Under & BTTS always shown:** Removed the `hasStatsData` gate in the formatter — the engine always produces valid O/U and BTTS values using fallback league averages, so suppressing them was incorrect
+- **`/refreshpredictions` command added:** Admin command to bust the prediction cache mid-day
+
+---
+
 ## Deployment Cheatsheet
 
 Every time you make a code change, deploy with:
