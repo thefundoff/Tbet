@@ -3,7 +3,7 @@ export const DISCLAIMER =
 
 export const MAX_MATCHES_PER_MESSAGE = 8
 export const PREDICTION_CACHE_HOURS = 12
-export const API_CALL_DELAY_MS = 6000   // API-Football free tier: 10 req/min = 1 per 6s
+export const API_CALL_DELAY_MS = 200    // API-Football pro plan: high rate limit, 200ms is a safe buffer
 export const TELEGRAM_SEND_DELAY_MS = 60 // ~16 msg/sec — well under Telegram's 30/sec global cap
 export const MIN_PREDICTION_CONFIDENCE  = 33  // surface predictions where we're ≥33% confident (one outcome must lead)
 export const SAFE_CONFIDENCE_THRESHOLD  = 65  // minimum confidence for the "safe games" filter

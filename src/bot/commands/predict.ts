@@ -43,9 +43,9 @@ export async function handlePredict(ctx: Context): Promise<void> {
     await ctx.reply(
       `🔒 <b>Subscription Required</b>${expiredNote}\n\n` +
       `Subscribe to a plan to unlock daily football predictions:\n\n` +
-      `📅 <b>Daily</b> — ₦500 · 2 picks now.toISOString().split('T')[0]\n` +
-      `📆 <b>Weekly</b> — ₦2,500 · 4 picks/day for 7 days\n` +
-      `🗓️ <b>Monthly</b> — ₦8,000 · 6 picks/day for 30 days`,
+      `📅 <b>Daily</b> — ₦500 · 4 picks today\n` +
+      `📆 <b>Weekly</b> — ₦2,500 · 7 picks/day for 7 days\n` +
+      `🗓️ <b>Monthly</b> — ₦8,000 · 11 picks/day for 30 days`,
       { parse_mode: 'HTML', reply_markup: kb }
     )
     return
@@ -74,9 +74,9 @@ export async function handlePredict(ctx: Context): Promise<void> {
 
     const isUpgradeable = tier === 'daily' || tier === 'weekly'
     const upgradeText   = tier === 'daily'
-      ? `\n\nWant more picks per fetch?\n📆 <b>Weekly</b> — 4 picks/day · ₦2,500\n🗓️ <b>Monthly</b> — 6 picks/day · ₦8,000`
+      ? `\n\nWant more picks per fetch?\n📆 <b>Weekly</b> — 7 picks/day · ₦2,500\n🗓️ <b>Monthly</b> — 11 picks/day · ₦8,000`
       : tier === 'weekly'
-      ? `\n\nWant even more picks?\n🗓️ <b>Monthly</b> — 6 picks/day · ₦8,000`
+      ? `\n\nWant even more picks?\n🗓️ <b>Monthly</b> — 11 picks/day · ₦8,000`
       : ''
 
     const kb = new InlineKeyboard()
@@ -157,9 +157,9 @@ export async function handlePredict(ctx: Context): Promise<void> {
   }
 }
 
-// API-Football free tier: 10 req/min. 3 fixtures × 2 stats calls × 6s delay ≈ 42s,
-// comfortably within Vercel's 60-second serverless limit.
-const MAX_FIXTURES_PER_BUILD = 3
+// Pro plan allows high request rates. 20 fixtures × ~3 calls × 200ms ≈ 12s sleep + API latency,
+// well within serverless limits. Gives enough pool for monthly users to get their full 11 picks.
+const MAX_FIXTURES_PER_BUILD = 20
 
 export async function buildPredictions(date: string) {
   const fixtures = await getFixturesByDate(date)
