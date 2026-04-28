@@ -35,11 +35,30 @@ function formatMatch(row: PredictionRow): string {
       } (+${row.value_edge}% edge vs market)</b>`
     : null
 
+  const inputs = row.algorithm_inputs as Record<string, unknown> | null
+  const hasStatsData = inputs?.homeForm !== null || inputs?.awayForm !== null
+  const isRisky = row.winner_confidence <= 40
+
+  const ouLine = hasStatsData
+    ? [
+        `📈 Over/Under 2.5: <b>${row.over_under_prediction === 'over' ? 'Over ↑' : 'Under ↓'}</b>`,
+        `   ${confidenceBar(Math.round(row.over_under_confidence))}`,
+      ]
+    : [`📈 Over/Under 2.5: <i>Insufficient team data</i>`]
+
+  const bttsLine = hasStatsData
+    ? [
+        `🔁 Both Teams Score: <b>${row.btts_prediction ? 'Yes ✅' : 'No ❌'}</b>`,
+        `   ${confidenceBar(Math.round(row.btts_confidence))}`,
+      ]
+    : [`🔁 Both Teams Score: <i>Insufficient team data</i>`]
+
   return [
     `⚽ <b>${row.home_team} vs ${row.away_team}</b>`,
     `🏆 ${row.league_name}${time}`,
     sourceLine,
     ...(valueLine ? [valueLine] : []),
+    ...(isRisky ? [`⚠️ <i>High-risk pick — odds are very close. Only stake what you can afford to lose.</i>`] : []),
     ``,
     `📊 <b>Win Probabilities</b>`,
     `🏠 ${homeLabel}`,
@@ -49,11 +68,9 @@ function formatMatch(row: PredictionRow): string {
     `✈️ ${awayLabel}`,
     `   ${awayBar}`,
     ``,
-    `📈 Over/Under 2.5: <b>${row.over_under_prediction === 'over' ? 'Over ↑' : 'Under ↓'}</b>`,
-    `   ${confidenceBar(Math.round(row.over_under_confidence))}`,
+    ...ouLine,
     ``,
-    `🔁 Both Teams Score: <b>${row.btts_prediction ? 'Yes ✅' : 'No ❌'}</b>`,
-    `   ${confidenceBar(Math.round(row.btts_confidence))}`,
+    ...bttsLine,
   ].join('\n')
 }
 

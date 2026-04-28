@@ -59,11 +59,9 @@ export async function getFixturesByDate(date: string): Promise<Fixture[]> {
   return apiFetch<Fixture>(`/fixtures?date=${date}&timezone=UTC`)
 }
 
-const FREE_PLAN_MAX_SEASON = 2024
-
 /**
  * Fetch team statistics for a given team/league/season.
- * Falls back to the previous season when the free plan blocks the requested one.
+ * Falls back to the previous season if no data is found for the requested one.
  * Returns null when no data is found.
  */
 export async function getTeamStatistics(
@@ -71,18 +69,17 @@ export async function getTeamStatistics(
   leagueId: number,
   season: number
 ): Promise<TeamStats | null> {
-  const effectiveSeason = Math.min(season, FREE_PLAN_MAX_SEASON)
   try {
     const results = await apiFetch<TeamStats>(
-      `/teams/statistics?team=${teamId}&league=${leagueId}&season=${effectiveSeason}`
+      `/teams/statistics?team=${teamId}&league=${leagueId}&season=${season}`
     )
     return results[0] ?? null
   } catch {
     // Try one season earlier as a last resort
-    if (effectiveSeason > 2022) {
+    if (season > 2022) {
       try {
         const results = await apiFetch<TeamStats>(
-          `/teams/statistics?team=${teamId}&league=${leagueId}&season=${effectiveSeason - 1}`
+          `/teams/statistics?team=${teamId}&league=${leagueId}&season=${season - 1}`
         )
         return results[0] ?? null
       } catch {
@@ -122,8 +119,6 @@ export async function getStandings(
 ): Promise<Standing[]> {
   type StandingsWrapper = { league: { standings: Standing[][] } }
 
-  const effectiveSeason = Math.min(season, FREE_PLAN_MAX_SEASON)
-
   async function fetch_standings(s: number): Promise<Standing[]> {
     const results = await apiFetch<StandingsWrapper>(`/standings?league=${leagueId}&season=${s}`)
     const wrapper = results[0]
@@ -132,10 +127,10 @@ export async function getStandings(
   }
 
   try {
-    return await fetch_standings(effectiveSeason)
+    return await fetch_standings(season)
   } catch {
-    if (effectiveSeason > 2022) {
-      try { return await fetch_standings(effectiveSeason - 1) } catch { return [] }
+    if (season > 2022) {
+      try { return await fetch_standings(season - 1) } catch { return [] }
     }
     return []
   }
