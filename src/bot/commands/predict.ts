@@ -109,17 +109,19 @@ export async function handlePredict(ctx: Context): Promise<void> {
       predictions = await buildPredictions(now.toISOString().split('T')[0])
     }
 
+    logger.info('Predictions fetched', { total: predictions.length, date: now.toISOString().split('T')[0] })
+
     const confident = predictions
       .filter(p => p.winner_confidence >= MIN_PREDICTION_CONFIDENCE)
       .sort((a, b) => b.winner_confidence - a.winner_confidence)
       .slice(0, matchLimit)
 
     if (confident.length === 0) {
-      await ctx.reply(
-        '⚠️ <b>No predictions available yet.</b>\n\n' +
-        'Our data providers are still loading fixtures for today. Please try again in a few minutes.',
-        { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('🏠 Main Menu', 'cmd_start') }
-      )
+      const msg = predictions.length === 0
+        ? '📭 <b>No major league fixtures today.</b>\n\nThere are no covered league matches scheduled for today. Check back tomorrow or use /matches to see what\'s on.'
+        : '⚠️ <b>No high-confidence picks today.</b>\n\nWe built predictions but today\'s matches are too evenly matched to confidently recommend. Check back later as odds may shift.'
+
+      await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('🏠 Main Menu', 'cmd_start') })
       return
     }
 
@@ -164,6 +166,13 @@ export async function buildPredictions(date: string) {
   const filtered = fixtures
     .filter(f => MAJOR_LEAGUE_IDS.includes(f.league.id))
     .slice(0, MAX_FIXTURES_PER_BUILD)
+
+  logger.info('buildPredictions: fixtures', {
+    date,
+    totalFromApi: fixtures.length,
+    majorLeagueMatches: filtered.length,
+    leagues: filtered.map(f => `${f.league.name} (id:${f.league.id})`),
+  })
 
   // --- Market odds (The Odds API) ---
   const sportKeys = [...new Set(
