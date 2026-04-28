@@ -37,6 +37,20 @@ CREATE TABLE IF NOT EXISTS predictions (
   -- 1X2
   predicted_winner      TEXT NOT NULL,                  -- 'home' | 'draw' | 'away'
   winner_confidence     NUMERIC(5,2) NOT NULL,          -- 0.00 – 100.00
+  home_probability      NUMERIC(5,2),
+  draw_probability      NUMERIC(5,2),
+  away_probability      NUMERIC(5,2),
+  prediction_source     TEXT,                           -- 'market' | 'statistical'
+  stat_home_probability NUMERIC(5,2),
+  stat_draw_probability NUMERIC(5,2),
+  stat_away_probability NUMERIC(5,2),
+  value_bet             TEXT,                           -- 'home' | 'draw' | 'away' | null
+  value_edge            INTEGER,
+
+  -- Resolution
+  actual_winner         TEXT,                           -- 'home' | 'draw' | 'away' | null
+  was_correct           BOOLEAN,
+  resolved_at           TIMESTAMPTZ,
 
   -- Over/Under 2.5
   over_under_prediction TEXT NOT NULL,                  -- 'over' | 'under'
