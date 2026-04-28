@@ -51,6 +51,15 @@ export async function getPredictionsByDate(date: string): Promise<PredictionRow[
   return (data ?? []) as PredictionRow[]
 }
 
+export async function deletePredictionsByDate(date: string): Promise<void> {
+  const db = getSupabaseClient()
+  const { error } = await db.from('predictions').delete().eq('match_date', date)
+  if (error) {
+    logger.error('deletePredictionsByDate failed', { date, error: error.message })
+    throw error
+  }
+}
+
 export async function upsertPrediction(prediction: PredictionInsert): Promise<void> {
   const db = getSupabaseClient()
   const { error } = await db.from('predictions').upsert(prediction, {

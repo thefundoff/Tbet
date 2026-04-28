@@ -4,7 +4,7 @@ import { termsGuardMiddleware } from './middleware/termsGuard'
 import { handleTermsAccept, handleTermsDecline } from './callbacks/terms'
 import { handleStart }       from './commands/start'
 import { handleMatches }     from './commands/matches'
-import { handlePredict }     from './commands/predict'
+import { handlePredict, handleRefreshPredictions } from './commands/predict'
 import { handleSubscribe }   from './commands/subscribe'
 import { handleUnsubscribe } from './commands/unsubscribe'
 import { handleResults }     from './commands/results'
@@ -59,7 +59,8 @@ export function createBot(): Bot {
   bot.command('unsubscribe', handleUnsubscribe)
   bot.command('invite',      handleInvite)
   bot.command('support',     handleSupport)
-  bot.command('broadcast',   handleBroadcast)  // admin only — not in BOT_COMMANDS
+  bot.command('broadcast',          handleBroadcast)          // admin only — not in BOT_COMMANDS
+  bot.command('refreshpredictions', handleRefreshPredictions) // admin only — not in BOT_COMMANDS
   bot.command('adminstats',  handleAdminStats) // admin only — not in BOT_COMMANDS
   bot.command('gencode',     handleGencode)   // admin only — not in BOT_COMMANDS
 

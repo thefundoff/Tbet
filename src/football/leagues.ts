@@ -82,6 +82,39 @@ export const MAJOR_LEAGUE_IDS: number[] = [
 ]
 
 /**
+ * League processing priority for buildPredictions.
+ * Lower number = processed first. Leagues with reliable team statistics
+ * (European top flights, UEFA) are prioritised so the fixture pool stays
+ * high-quality even when MAX_FIXTURES_PER_BUILD caps the slice.
+ * Leagues not listed here fall back to priority 99.
+ */
+export const LEAGUE_PRIORITY: Record<number, number> = {
+  2:   1,   // UEFA Champions League
+  3:   2,   // UEFA Europa League
+  848: 3,   // UEFA Conference League
+  39:  4,   // Premier League
+  140: 5,   // La Liga
+  135: 6,   // Serie A
+  78:  7,   // Bundesliga
+  61:  8,   // Ligue 1
+  88:  9,   // Eredivisie
+  94:  10,  // Primeira Liga
+  203: 11,  // Süper Lig
+  40:  12,  // Championship
+  141: 13,  // La Liga 2
+  136: 14,  // Serie B
+  79:  15,  // 2. Bundesliga
+  62:  16,  // Ligue 2
+  144: 17,  // Jupiler Pro League
+  179: 18,  // Scottish Premiership
+  197: 19,  // Greek Super League
+  235: 20,  // Russian Premier League
+  307: 21,  // Saudi Pro League
+  253: 22,  // MLS
+  262: 23,  // Liga MX
+}
+
+/**
  * Maps API-Football league IDs to The Odds API sport keys.
  * Only leagues available on The Odds API free tier are included.
  */

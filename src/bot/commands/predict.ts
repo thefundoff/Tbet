@@ -1,11 +1,11 @@
 import type { Context } from 'grammy'
 import { InlineKeyboard } from 'grammy'
 import { getFixturesByDate, getTeamStatistics, getHeadToHead } from '../../football/apiClient'
-import { MAJOR_LEAGUE_IDS, LEAGUE_TO_SPORT_KEY } from '../../football/leagues'
+import { MAJOR_LEAGUE_IDS, LEAGUE_TO_SPORT_KEY, LEAGUE_PRIORITY } from '../../football/leagues'
 import { fetchOddsMap, lookupOdds } from '../../football/oddsClient'
 import { generatePrediction } from '../../prediction/engine'
 import { formatPredictionChunks } from '../../prediction/formatter'
-import { getPredictionsByDate, upsertPrediction } from '../../db/predictions'
+import { getPredictionsByDate, upsertPrediction, deletePredictionsByDate } from '../../db/predictions'
 import type { PredictionInsert } from '../../db/predictions'
 import { getUserById, recordPredictionFetch } from '../../db/users'
 import { PLANS, getActivePlanTier } from '../../utils/plans'
@@ -165,6 +165,7 @@ export async function buildPredictions(date: string) {
   const fixtures = await getFixturesByDate(date)
   const filtered = fixtures
     .filter(f => MAJOR_LEAGUE_IDS.includes(f.league.id))
+    .sort((a, b) => (LEAGUE_PRIORITY[a.league.id] ?? 99) - (LEAGUE_PRIORITY[b.league.id] ?? 99))
     .slice(0, MAX_FIXTURES_PER_BUILD)
 
   logger.info('buildPredictions: fixtures', {
@@ -295,4 +296,19 @@ export async function buildPredictions(date: string) {
   }
 
   return getPredictionsByDate(date)
+}
+
+export async function handleRefreshPredictions(ctx: Context): Promise<void> {
+  const userId  = ctx.from?.id
+  const adminId = parseInt(process.env.ADMIN_TELEGRAM_ID ?? '0', 10)
+  if (!userId || userId !== adminId) return
+
+  const today = new Date().toISOString().split('T')[0]
+  try {
+    await deletePredictionsByDate(today)
+    await ctx.reply(`✅ Prediction cache cleared for <b>${today}</b>. Next /predict will rebuild fresh.`, { parse_mode: 'HTML' })
+  } catch (err) {
+    logger.error('handleRefreshPredictions error', { error: String(err) })
+    await ctx.reply('⚠️ Failed to clear prediction cache. Check logs.')
+  }
 }
